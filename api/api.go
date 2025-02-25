@@ -64,22 +64,36 @@ func (s *ApiServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 	return fmt.Errorf("method not allowed : %v", r.Method)
 }
 func (s *ApiServer) handleGetAccounts(w http.ResponseWriter, r *http.Request) error {
-	account := NewAccount("BB", "Gandak")
-	account1 := NewAccount("BB", "Gandak")
-	account2 := NewAccount("BB", "Gandak")
+	// account := NewAccount("BB", "Gandak")
+	// account1 := NewAccount("BB", "Gandak")
+	// account2 := NewAccount("BB", "Gandak")
 
-	accounts := []*Account{account, account1, account2}
+	// accounts := []*Account{account, account1, account2}
 
-	type AccountsResponse struct {
-		Id int `json:"id"`
-    Data []*Account `json:"data"`
+	// type AccountsResponse struct {
+	// 	Id int `json:"id"`
+  //   Data []*Account `json:"data"`
+	// }
+
+	// accountsResponse := AccountsResponse{Data: accounts}
+
+	accounts, err := s.store.GetAllAccounts();
+	if err != nil {
+		return err
 	}
-
-	accountsResponse := AccountsResponse{Data: accounts}
-	return WriteJSON(w, http.StatusOK, accountsResponse)
+	return WriteJSON(w, http.StatusOK, accounts)
 }
 func (s *ApiServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	createAccountReq := new(CreateAccountRequest)
+	if err := json.NewDecoder(r.Body).Decode(createAccountReq); err != nil {
+		return err
+	}
+	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
+	if err := s.store.CreateAccount(account); err!=nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, account)
 }
 func (s *ApiServer) handleUpdateAccount(w http.ResponseWriter, r *http.Request) error {
 	return nil

@@ -1,6 +1,14 @@
 package api
 
-import "math/rand/v2"
+import (
+	"math/rand/v2"
+	"time"
+)
+
+type CreateAccountRequest struct {
+	FirstName string	`json:"firstName"`
+	LastName string `json:"lastName"`
+}
 
 type Account struct {
 	ID        int    `json:"id"`
@@ -8,6 +16,7 @@ type Account struct {
 	LastName  string `json:"lastName"`
 	Number    int    `json:"number"`
 	Balance   int    `json:"balance"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 func NewAccount(firstName, lastName string) *Account {
@@ -16,5 +25,6 @@ func NewAccount(firstName, lastName string) *Account {
 		FirstName: firstName,
 		LastName:  lastName,
 		Number:    rand.IntN(1000000),
+		CreatedAt: time.Now().UTC(),
 	}
 }
