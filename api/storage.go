@@ -2,6 +2,9 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"log"
+	"strconv"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -52,28 +55,92 @@ func (s *PostgreStore) createAccountTable() error {
 
 func (s *PostgreStore) CreateAccount(account *Account) error {
     query := `
-			insert into account (firstName, lastName, number, balance, createdAt) values ($1, $2, $3, $4, $5);
+			insert into account (firstName, lastName, number, balance, createdAt) values (@firstName, @lastName, @number, @balance, @createdAt);
     `
-    args := []interface{}{
-        account.FirstName,
-        account.LastName,
-        account.Number,
-        account.Balance,
-        account.CreatedAt,
+    args := pgx.NamedArgs{
+			"firstName": account.FirstName,
+			"lastName": account.LastName,
+			"number": account.Number,
+			"balance": account.Balance,
+			"createdAt": account.CreatedAt,
     }
 
-    _, err := s.conn.Exec(context.Background(), query, args...)
+    _, err := s.conn.Exec(context.Background(), query, args)
     return err
 }
-func(s *PostgreStore) UpdateAccount(account *Account, i int) (error) {
-	return nil
+
+func (s *PostgreStore) UpdateAccount(account *Account, accountId int) error {
+    query := "UPDATE account SET "
+    namedArgs := pgx.NamedArgs{}
+    updates := make(map[string]interface{})
+    argCount := 1
+
+    if account.FirstName != "" {
+        updates["firstName"] = account.FirstName
+    }
+    if account.LastName != "" {
+        updates["lastName"] = account.LastName
+    }
+    if account.Number != 0 {
+        updates["number"] = account.Number
+    }
+    if account.Balance != 0 {
+        updates["balance"] = account.Balance
+    }
+
+    if len(updates) == 0 {
+        return nil 
+    }
+
+    for key, value := range updates {
+        query += key + " = @" + key + ", "
+        namedArgs[key] = value
+        argCount++
+    }
+
+    query = query[:len(query)-2] // Remove trailing comma and space
+    query += " WHERE id = $" + strconv.Itoa(argCount)
+    namedArgs["id"] = accountId
+
+    _, err := s.conn.Exec(context.Background(), query, namedArgs)
+    return err
 }
-func(s *PostgreStore) DeleteAccount(i int) (error) {
-	return nil
+
+func(s *PostgreStore) DeleteAccount(accountId int) (error) {
+	query := `
+		delete from account where id = @accountId;
+	`
+	args := pgx.NamedArgs{
+		"accountId": strconv.Itoa(accountId),
+	}
+	_, err := s.conn.Exec(context.Background(), query, args)
+	if err != nil {
+		log.Fatalf("error while deletion in DB: %v", err)
+	}
+	return err
 }
-func(s *PostgreStore) GetAccountByID(int) (*Account, error) {
-	return &Account{}, nil
+
+func(s *PostgreStore) GetAccountByID(accountId int) (*Account, error) {
+	query := `
+		select * from account where id = @accountId;
+	`
+	args := pgx.NamedArgs{
+		"accountId": strconv.Itoa(accountId),
+	}
+	row := s.conn.QueryRow(context.Background(), query, args)
+
+	var res Account 
+	err := row.Scan(&res.ID, &res.FirstName, &res.LastName, &res.Number, &res.Balance, &res.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("this is gone brrrrr")
+		}
+	return nil, err
+	}
+	
+	return &res, nil
 }
+
 func(s *PostgreStore) GetAllAccounts() ([]*Account, error) {
 	query := `
 		select * from account;
@@ -85,6 +152,9 @@ func(s *PostgreStore) GetAllAccounts() ([]*Account, error) {
 	defer rows.Close()
 
 	accounts := []*Account{}
+
+	//Short way to new pgx version
+	// accounts, err := pgx.CollectRows(rows, pgx.RowToStructByName[*Account])
 	for rows.Next() {
 		var account Account
 		err := rows.Scan(
